@@ -4,6 +4,8 @@ import threading
 import time
 import ctypes
 import inspect
+import requests
+from lxml import etree
 
 def _async_raise(thread):
     """
@@ -14,7 +16,7 @@ def _async_raise(thread):
     """
     try:
         tid = thread.ident
-        #tid = ctypes.c_long(tid)
+        # tid = ctypes.c_long(tid)
         exctype = SystemExit
         """raises the exception, performs cleanup if needed"""
         if not inspect.isclass(exctype):
@@ -44,14 +46,6 @@ class Control(object):
         self.spider_thread.start()
         self.wechat_thread.start()
 
-    def MySpider(self, win):
-        while True:
-            if win.run_status == True:
-                self.task_list = self.get_task_list(win)
-
-            time.sleep( win.refresh_time ) # 刷新时间
-            print("Spider线程休眠！")
-
     def login_WeChat(self, win):
         while True:
             if self.win_close == False and win.wechar_login == True and self.wechat_login_flag == False:
@@ -65,6 +59,51 @@ class Control(object):
                     print(err)
             time.sleep(1.0)
             print("WeChat休眠！")
+
+    def MySpider(self, win):
+        while True:
+            if win.run_status == True:
+                data_list = self.get_data("https://ama-gift.com/list.php?page=1", 0)
+                task_list = self.get_task_list(win)
+
+                if self.wechat_login_flag == True:
+                    pass
+
+            time.sleep( win.refresh_time ) # 刷新时间
+            print("Spider线程休眠！")
+
+    def getdata_and_write(self, jsons_tmp, cond2):
+        # -------------此处记得加上线程锁--------------------#
+        cond2.acquire()  # 获得锁
+
+        cond2.release()  # 释放锁
+        return 1
+
+    def get_data(self, url, currency):
+        """
+        得到指定网页的数据
+        """
+        re = requests.post(url=url, data={"g_type": currency})
+        re.encoding = 'utf-8'  # 编码格式
+        html = etree.HTML(re.text)
+        trs = html.xpath('/html/body/section/section/div[3]/section/article/div/table/tr')
+        data_list = []
+        for tr in trs[1:]:
+            tds = tr.xpath('./td')
+            td_text = []
+            td_text = td_text + tds[0].xpath('./img/@src')
+            for td in tds[1:5]:
+                try:
+                    td_text = td_text + td.xpath('./span/text()')
+                except Exception as err:
+                    print(err)
+
+            td_text = td_text + tr.xpath('./td[@class="pc"]/text()')
+            td_text = td_text + tds[6].xpath('./text()')
+            print(td_text)
+            data_list.append(td_text)
+        return data_list
+
 
     def get_task_list(self, win):
         win.task_status_ind = 6  # 状态信息所在字段的位置
