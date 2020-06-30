@@ -3,6 +3,7 @@
 #from tkinter import *
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox
 import tkinter.font as tkFont
 import tkutils as tku
 from PIL import Image, ImageTk	# pip3 install pillow
@@ -15,6 +16,14 @@ class MainWindows(object):
 
     def __init__(self, root, title = "顶定制化监测工具"):
         self.root = root
+
+        def on_closing():
+            if messagebox.askokcancel("Quit", "Do you want to quit?"):
+                if self.winclose_callback != None:
+                    self.winclose_callback()
+                root.destroy()
+
+        root.protocol("WM_DELETE_WINDOW", on_closing)
         # 获取屏幕分辨率
         screenWidth = self.root.winfo_screenwidth()
         screenHeight = self.root.winfo_screenheight()
@@ -23,7 +32,7 @@ class MainWindows(object):
         self.root.title(title)           #窗口名
         self.root.geometry('1068x681+10+10')
         tku.center_window(self.root)  # 将窗体移动到屏幕中央
-        # self.root.iconbitmap("Money.ico")  # 窗体图标
+        self.root.iconbitmap("./favicon.ico")  # 窗体图标
         self.root.resizable(False, False)  # 设置窗体不可改变大小
         self.getUserData()
         self.root.attributes("-alpha", 0.95)  # 虚化，值越小虚化程度越高
@@ -33,6 +42,7 @@ class MainWindows(object):
         self.task_status_ind = 6 # 状态信息所在字段的位置
         self.run_status = False
         self.refresh_time = 10 # 刷新时间
+        self.winclose_callback = None # 窗口关闭的回调函数
 
     def getUserData(self):
         fp = codecs.open("./init_config.cfg", "r", "utf8")
@@ -144,8 +154,6 @@ class MainWindows(object):
                                    bg="DimGray", command=self.wechat_click)
         self.img_frame.pack(side=tk.BOTTOM)
 
-
-
     def add_task(self):
         print("添加任务")
         radio_val = self.RadioManager.get()
@@ -249,10 +257,6 @@ class MainWindows(object):
         # self.tree.bind('<ButtonRelease-1>', treeviewClick)  # 单机释放回调处理
         # self.tree.bind('<<TreeviewSelect>>', selectTree)
 
-    def show_multi(self):
-        print("show_multi")
-        pass
-
     def start_task(self):
         """
         任务开始运行函数，start_button触发
@@ -326,7 +330,10 @@ class MainWindows(object):
                                 command=self.save_config, font=self.my_ft2, height=1, fg="white", width=10)
         self.save_button.pack(side=tk.LEFT, expand=tk.YES, anchor=tk.CENTER, padx=5)
 
-    def run(self):
+    def run(self, callback = None):
+        # 窗口关闭后的回调函数
+        self.winclose_callback = callback
+        # 绘制窗口
         self.left_frame.pack(side=tk.LEFT, anchor=tk.CENTER, fill='y', padx=5, pady=5)
         self.top_frame.pack(side=tk.TOP, anchor=tk.CENTER, fill='x', padx=5, pady=5)
         self.bottom_frame.pack(side=tk.BOTTOM, anchor=tk.CENTER, fill='x', padx=5, pady=5)
