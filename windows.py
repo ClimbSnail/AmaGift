@@ -14,9 +14,9 @@ import os
 
 class MainWindows(object):
 
-    def __init__(self, root, title = "顶定制化监测工具"):
+    def __init__(self, root, title = "顶定制化监测工具", lock = None):
         self.root = root
-
+        self.lock = lock
         def on_closing():
             if messagebox.askokcancel("Quit", "Do you want to quit?"):
                 if self.winclose_callback != None:
@@ -84,13 +84,14 @@ class MainWindows(object):
         # 面值字体
         face_val_frame = tk.Frame(self.left_frame, bg=self.left_frame['bg'])
         face_val_label = tk.Label(face_val_frame, text=labels[1], font=self.my_ft1, bg=face_val_frame['bg'])
-        face_val_label.pack(side='left', anchor='sw')
-        # 面值选择下拉框
-        self.val_cmb = ttk.Combobox(face_val_frame, width=12, textvariable=15)
-        self.val_cmb['values'] = self.gui["facevalue"].strip().split()[1:]  # 设置下拉列表的值
-        self.val_cmb.current(0)
-        # self.val_cmb.bind("<<ComboboxSelected>>", val_cmb_selected)
-        self.val_cmb.pack(side=tk.LEFT, padx=10)
+        face_val_label.pack(side=tk.TOP,  padx=10, pady=5)
+        # 面值范围框
+        self.face_val_min = tk.Text(face_val_frame, font=self.my_ft2, width = 8, height=1, highlightcolor="LightGrey")
+        self.face_val_min.pack(side=tk.LEFT)  # 将小部件放置到窗口中
+        tk.Label(face_val_frame, text="<", font=self.my_ft1, bg=face_val_frame['bg'])\
+            .pack(side=tk.LEFT, anchor='sw', padx=4)
+        self.face_val_max = tk.Text(face_val_frame, font=self.my_ft2, width = 8, height=1, highlightcolor="LightGrey")
+        self.face_val_max.pack(side=tk.LEFT)  # 将小部件放置到窗口中
         face_val_frame.pack(side=tk.TOP, pady=8)
 
         # 价格Frame
@@ -156,23 +157,36 @@ class MainWindows(object):
 
     def add_task(self):
         print("添加任务")
-        radio_val = self.RadioManager.get()
-        currency = self.radio_texts[radio_val]
-        face_val = self.val_cmb.get().strip()
-        price_min = self.price_min.get(0.0, tk.END).strip()
-        price_max = self.price_max.get(0.0, tk.END).strip()
-        num_min = self.num_min.get(0.0, tk.END).strip()
-        num_max = self.num_max.get(0.0, tk.END).strip()
-        salesrate = self.salesrate.get(0.0, tk.END).strip()
-        percent_min = self.percent_min.get(0.0, tk.END).strip()
-        percent_max = self.percent_max.get(0.0, tk.END).strip()
+        try:
+            radio_val = self.RadioManager.get()
+            currency = self.radio_texts[radio_val]
+            face_val_min = self.face_val_min.get(0.0, tk.END).strip()
+            face_val_max = self.face_val_max.get(0.0, tk.END).strip()
+            price_min = self.price_min.get(0.0, tk.END).strip()
+            price_max = self.price_max.get(0.0, tk.END).strip()
+            num_min = self.num_min.get(0.0, tk.END).strip()
+            num_max = self.num_max.get(0.0, tk.END).strip()
+            salesrate = self.salesrate.get(0.0, tk.END).strip()
+            percent_min = self.percent_min.get(0.0, tk.END).strip()
+            percent_max = self.percent_max.get(0.0, tk.END).strip()
 
-        # 构建插入的条目
-        field_info = [currency, face_val, price_min+'-'+price_max, salesrate,
-                      num_min+'-'+num_max, percent_min+'-'+percent_max]
-        taskkey = "task"+str(len(self.tree.get_children())+1)
+            if currency=="" or face_val_min=="" or face_val_max=="" or price_min=="" or price_max=="" or num_min=="" or \
+                num_max == "" or salesrate=="" or percent_min=="" or percent_max=="":
+                return False
+            # 构建插入的条目
+            field_info = [currency, face_val_min+'-'+face_val_max, price_min+'-'+price_max, salesrate,
+                          num_min+'-'+num_max, percent_min+'-'+percent_max]
+            taskkey = "task"+str(len(self.tree.get_children())+1)
+        except Exception as err:
+            return False
+
+        if None != self.lock:
+            self.lock.acquire()  # 获得锁
         item = self.tree.insert("", tk.END, text=taskkey, values=field_info)  #给第末行添加数据，索引值可重复
         self.tree.set(item, column=self.task_status_ind, value="已关闭")
+        if None != self.lock:
+            self.lock.release()  # 释放锁
+        return True
 
     def wechat_click(self):
         if self.wechar_login == False:
@@ -233,7 +247,7 @@ class MainWindows(object):
         s.configure('Treeview', rowheight=40)  # repace 40 with whatever you need
         self.tree["columns"] = top_kind
         self.task_status_ind = top_kind.index("状态")
-        width_list = [80, 80, 150, 100, 100, 120, 80]
+        width_list = [80, 120, 150, 60, 100, 120, 80]
         for col, width in zip(self.tree["columns"], width_list):
             self.tree.column(col, width=width, anchor="center")  #设置列
             self.tree.heading(col, text=col)  # #设置显示的表头名
@@ -289,6 +303,21 @@ class MainWindows(object):
         text_src = self.save_button["text"]
         self.save_button["text"] = "成功"
         self.save_button.update()
+        task_num = len(self.tree.get_children())
+        self.taskinfo = {"tasknum":str(task_num), "updatatime":str(self.refresh_time)}
+        for item, pos in zip(self.tree.get_children(),range(task_num)):
+            task = {}
+            task["currency"] = self.tree.item(item, "values")[0]
+            task["facevalue"] = self.tree.item(item, "values")[1]
+            task["price"] = self.tree.item(item, "values")[2]
+            task["salesrate"] = self.tree.item(item, "values")[3]
+            task["num"] = self.tree.item(item, "values")[4]
+            task["percentage"] = self.tree.item(item, "values")[5]
+            self.taskinfo["task"+str(pos+1)] = task
+        self.set_data["taskinfo"] = self.taskinfo
+        fp = codecs.open("./init_config.cfg", "w", "utf8")
+        json.dump(self.set_data, fp, indent=2)
+        fp.close()
         time.sleep(0.5)
         self.save_button["text"] = text_src
 
