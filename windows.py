@@ -30,27 +30,40 @@ class MainWindows(object):
         # print(screenWidth, screenHeight)
 
         self.root.title(title)           #窗口名
-        self.root.geometry('1068x681+10+10')
+        self.root.geometry('1200x750+10+10')
         tku.center_window(self.root)  # 将窗体移动到屏幕中央
         self.root.iconbitmap("./favicon.ico")  # 窗体图标
-        self.root.resizable(False, False)  # 设置窗体不可改变大小
-        self.getUserData()
+        #self.root.resizable(False, False)  # 设置窗体不可改变大小
         self.root.attributes("-alpha", 0.95)  # 虚化，值越小虚化程度越高
         self.my_ft1 = tkFont.Font(family="微软雅黑", size=12, weight=tkFont.BOLD)   # 定义字体
         self.my_ft2 = tkFont.Font(family="微软雅黑", size=14, weight=tkFont.BOLD)   # 定义字体
         self.wechar_login = False
-        self.task_status_ind = 6 # 状态信息所在字段的位置
         self.run_status = False
-        self.refresh_time = 10 # 刷新时间
+        self.task_run_res = []
         self.winclose_callback = None # 窗口关闭的回调函数
+        self.getUserData("./init_config.cfg")
+        # 状态信息所在字段的位置
+        self.task_status_ind = len(self.gui["fields"].strip().split())-1
+        self.tree_map_ind = {
+            "curchoose": 0,
+            "remainder": 1,
+            "facevalue": 2,
+            "price": 3,
+            "salesrate": 4,
+            "num": 5,
+            "percentage": 6,
+            "status":7
+        }
 
-    def getUserData(self):
-        fp = codecs.open("./init_config.cfg", "r", "utf8")
+    def getUserData(self, path):
+        fp = codecs.open(path, "r", "utf8")
         self.set_data = json.load(fp)
         fp.close()
         self.system_init = self.set_data["system_init"]
         self.gui = self.set_data["gui"]
         self.taskinfo = self.set_data["taskinfo"]
+
+        self.refresh_time = int(self.taskinfo["updatatime"]) if self.taskinfo["updatatime"] != "" else 10
 
     def letf_init(self):
         self.left_frame = tk.Frame(self.root, bg = "DimGray")
@@ -58,10 +71,10 @@ class MainWindows(object):
         labels = []
 
         for text in label_text:  # 第一个小部件插入数据
-            text = text.split()[0]  # 为了处理"facevalue"的情况
             labels.append( text )
 
-        choose_label = tk.Label(self.left_frame, text=labels[0], font=self.my_ft1, bg=self.left_frame['bg'])
+        ind = self.tree_map_ind["curchoose"]
+        choose_label = tk.Label(self.left_frame, text=labels[ind], font=self.my_ft1, bg=self.left_frame['bg'])
         choose_label.pack()
         # 单选按钮
         self.radio_frames = []
@@ -81,9 +94,22 @@ class MainWindows(object):
         # 设置第一个未默认
         self.RadioManager.set(0)
 
+        # 剩余frame
+        remainder_frame = tk.Frame(self.left_frame, bg=self.left_frame['bg'])
+        # 销售率
+        ind = self.tree_map_ind["remainder"]
+        salesrate_label = tk.Label(remainder_frame, text=labels[ind], font=self.my_ft1, bg=remainder_frame['bg'])
+        salesrate_label.pack(side=tk.LEFT, anchor='sw')
+        tk.Label(remainder_frame, text=">", font=self.my_ft1, bg=remainder_frame['bg'])\
+            .pack(side=tk.LEFT, anchor='sw', padx=4)
+        self.remainder = tk.Text(remainder_frame, font=self.my_ft2, width = 8, height=1, highlightcolor="LightGrey")
+        self.remainder.pack(side=tk.LEFT, padx=10)  # 将小部件放置到窗口中
+        remainder_frame.pack(side=tk.TOP, padx=10, pady=8)
+
         # 面值字体
         face_val_frame = tk.Frame(self.left_frame, bg=self.left_frame['bg'])
-        face_val_label = tk.Label(face_val_frame, text=labels[1], font=self.my_ft1, bg=face_val_frame['bg'])
+        ind = self.tree_map_ind["facevalue"]
+        face_val_label = tk.Label(face_val_frame, text=labels[ind], font=self.my_ft1, bg=face_val_frame['bg'])
         face_val_label.pack(side=tk.TOP,  padx=10, pady=5)
         # 面值范围框
         self.face_val_min = tk.Text(face_val_frame, font=self.my_ft2, width = 8, height=1, highlightcolor="LightGrey")
@@ -97,7 +123,8 @@ class MainWindows(object):
         # 价格Frame
         price_frame = tk.Frame(self.left_frame, bg=self.left_frame['bg'])
         # 价格
-        price_label = tk.Label(price_frame, text=labels[2], font=self.my_ft1, bg=price_frame['bg'])
+        ind = self.tree_map_ind["price"]
+        price_label = tk.Label(price_frame, text=labels[ind], font=self.my_ft1, bg=price_frame['bg'])
         price_label.pack(side=tk.TOP, pady=5)
         # 价格框
         self.price_min = tk.Text(price_frame, font=self.my_ft2, width = 8, height=1, highlightcolor="LightGrey")
@@ -111,7 +138,8 @@ class MainWindows(object):
         # 销售率frame
         salesrate_frame = tk.Frame(self.left_frame, bg=self.left_frame['bg'])
         # 销售率
-        salesrate_label = tk.Label(salesrate_frame, text=labels[3], font=self.my_ft1, bg=salesrate_frame['bg'])
+        ind = self.tree_map_ind["salesrate"]
+        salesrate_label = tk.Label(salesrate_frame, text=labels[ind], font=self.my_ft1, bg=salesrate_frame['bg'])
         salesrate_label.pack(side=tk.LEFT, anchor='sw')
         self.salesrate = tk.Text(salesrate_frame, font=self.my_ft2, width = 8, height=1, highlightcolor="LightGrey")
         self.salesrate.pack(side=tk.LEFT, padx=10)  # 将小部件放置到窗口中
@@ -120,7 +148,8 @@ class MainWindows(object):
         # 销售数量Frame
         num_frame = tk.Frame(self.left_frame, bg=self.left_frame['bg'])
         # 销售数量
-        num_label = tk.Label(num_frame, text=labels[4], font=self.my_ft1, bg=num_frame['bg'])
+        ind = self.tree_map_ind["num"]
+        num_label = tk.Label(num_frame, text=labels[ind], font=self.my_ft1, bg=num_frame['bg'])
         num_label.pack(side=tk.TOP,  padx=10, pady=5)
         # 销售范围框
         self.num_min = tk.Text(num_frame, font=self.my_ft2, width = 8, height=1, highlightcolor="LightGrey")
@@ -134,7 +163,8 @@ class MainWindows(object):
         # 销售百分比Frame
         percent_frame = tk.Frame(self.left_frame, bg=self.left_frame['bg'])
         # 销售百分比
-        percent_label = tk.Label(percent_frame, text=labels[5], font=self.my_ft1, bg=percent_frame['bg'])
+        ind = self.tree_map_ind["percentage"]
+        percent_label = tk.Label(percent_frame, text=labels[ind], font=self.my_ft1, bg=percent_frame['bg'])
         percent_label.pack(side=tk.TOP,  padx=10, pady=5)
         # 销售百分比范围框
         self.percent_min = tk.Text(percent_frame, font=self.my_ft2, width = 8, height=1, highlightcolor="LightGrey")
@@ -150,7 +180,7 @@ class MainWindows(object):
                                 command=self.add_task, font=self.my_ft1, height=1, fg="white", width=10)
         self.add_button.pack(side=tk.TOP, expand=tk.YES, anchor=tk.CENTER)
 
-        self.wechat_img = ImageTk.PhotoImage(Image.open('./Stop_Wechat_ico.ico'))
+        self.wechat_img = ImageTk.PhotoImage(Image.open('./Stop_Wechat.ico'))
         self.img_frame = tk.Button(self.left_frame, relief=tk.FLAT, image = self.wechat_img,
                                    bg="DimGray", command=self.wechat_click)
         self.img_frame.pack(side=tk.BOTTOM)
@@ -159,7 +189,8 @@ class MainWindows(object):
         print("添加任务")
         try:
             radio_val = self.RadioManager.get()
-            currency = self.radio_texts[radio_val]
+            curchoose = self.radio_texts[radio_val]
+            remainder = self.remainder.get(0.0, tk.END).strip()
             face_val_min = self.face_val_min.get(0.0, tk.END).strip()
             face_val_max = self.face_val_max.get(0.0, tk.END).strip()
             price_min = self.price_min.get(0.0, tk.END).strip()
@@ -170,11 +201,11 @@ class MainWindows(object):
             percent_min = self.percent_min.get(0.0, tk.END).strip()
             percent_max = self.percent_max.get(0.0, tk.END).strip()
 
-            if currency=="" or face_val_min=="" or face_val_max=="" or price_min=="" or price_max=="" or num_min=="" or \
+            if curchoose=="" or face_val_min=="" or face_val_max=="" or price_min=="" or price_max=="" or num_min=="" or \
                 num_max == "" or salesrate=="" or percent_min=="" or percent_max=="":
                 return False
             # 构建插入的条目
-            field_info = [currency, face_val_min+'-'+face_val_max, price_min+'-'+price_max, salesrate,
+            field_info = [curchoose, remainder, face_val_min+'-'+face_val_max, price_min+'-'+price_max, salesrate,
                           num_min+'-'+num_max, percent_min+'-'+percent_max]
             taskkey = "task"+str(len(self.tree.get_children())+1)
         except Exception as err:
@@ -188,6 +219,18 @@ class MainWindows(object):
             self.lock.release()  # 释放锁
         return True
 
+    def updata_task_res(self):
+
+        if None != self.lock:
+            self.lock.acquire()  # 获得锁
+        for item, pos in zip(self.tree.get_children(),range(len(self.tree.get_children()))):
+            text = self.tree.item(item, "values")[self.task_status_ind]
+            text = text.split('(')[0]
+            text = text+"(有数据)" if self.task_run_res[pos] == 1 else text
+            self.tree.set(item, column=self.task_status_ind, value=text)
+        if None != self.lock:
+            self.lock.release()  # 释放锁
+
     def wechat_click(self):
         if self.wechar_login == False:
             self.wechar_login = True
@@ -196,10 +239,10 @@ class MainWindows(object):
 
     def set_wechat_status(self, status):
         if status == True:
-            self.wechat_img = ImageTk.PhotoImage(Image.open('./Run_Wechat_ico.ico'))
+            self.wechat_img = ImageTk.PhotoImage(Image.open('./Run_Wechat.ico'))
             self.img_frame["image"] = self.wechat_img
         else:
-            self.wechat_img = ImageTk.PhotoImage(Image.open('./Stop_Wechat_ico.ico'))
+            self.wechat_img = ImageTk.PhotoImage(Image.open('./Stop_Wechat.ico'))
             self.img_frame["image"] = self.wechat_img
 
 
@@ -221,14 +264,11 @@ class MainWindows(object):
             column = event.widget.identify_column(x)
             print ('\n&&&&&&&& def selectItem(self, event):')
             print ('item = ', item)
-            print ('itemText = ', itemText)
             print('itemValues = ',itemValues)
-            print ('iid = ', iid)
-            print ('column = ', column)
 
             for item in self.tree.selection():
                 print("len = ", len(self.tree.item(item, "values")))
-                if self.tree.item(item, "values")[self.task_status_ind] == "已关闭":
+                if "已关闭" in self.tree.item(item, "values")[self.task_status_ind]:
                     self.tree.set(item, column=self.task_status_ind, value="运行中")
                 else:
                     self.tree.set(item, column=self.task_status_ind, value="已关闭")
@@ -240,14 +280,14 @@ class MainWindows(object):
         self.scrollbar = tk.Scrollbar(self.root,)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self.tree = ttk.Treeview(self.top_frame, show = "headings", height = 12,
+        self.tree = ttk.Treeview(self.top_frame, show = "headings", height = 14,
                                  yscrollcommand=self.scrollbar.set, selectmode = tk.BROWSE)
         # height为显示多少行数据 headings为只显示表头
         s = ttk.Style()
         s.configure('Treeview', rowheight=40)  # repace 40 with whatever you need
         self.tree["columns"] = top_kind
         self.task_status_ind = top_kind.index("状态")
-        width_list = [80, 120, 150, 60, 100, 120, 80]
+        width_list = [80, 40, 120, 150, 60, 100, 100, 100]
         for col, width in zip(self.tree["columns"], width_list):
             self.tree.column(col, width=width, anchor="center")  #设置列
             self.tree.heading(col, text=col)  # #设置显示的表头名
@@ -267,7 +307,6 @@ class MainWindows(object):
         self.tree.bind('<Double-1>', ldoubleTree)    # 左键双击
         self.tree.bind('<3>', rsingleTree)    # 右键单击
         # self.tree.bind("<Control-a>", ldoubleTree)  # ctrl+A
-
         # self.tree.bind('<ButtonRelease-1>', treeviewClick)  # 单机释放回调处理
         # self.tree.bind('<<TreeviewSelect>>', selectTree)
 
@@ -307,12 +346,13 @@ class MainWindows(object):
         self.taskinfo = {"tasknum":str(task_num), "updatatime":str(self.refresh_time)}
         for item, pos in zip(self.tree.get_children(),range(task_num)):
             task = {}
-            task["currency"] = self.tree.item(item, "values")[0]
-            task["facevalue"] = self.tree.item(item, "values")[1]
-            task["price"] = self.tree.item(item, "values")[2]
-            task["salesrate"] = self.tree.item(item, "values")[3]
-            task["num"] = self.tree.item(item, "values")[4]
-            task["percentage"] = self.tree.item(item, "values")[5]
+            task["curchoose"] = self.tree.item(item, "values")[self.tree_map_ind["curchoose"]]
+            task["remainder"] = self.tree.item(item, "values")[self.tree_map_ind["remainder"]]
+            task["facevalue"] = self.tree.item(item, "values")[self.tree_map_ind["facevalue"]]
+            task["price"] = self.tree.item(item, "values")[self.tree_map_ind["price"]]
+            task["salesrate"] = self.tree.item(item, "values")[self.tree_map_ind["salesrate"]]
+            task["num"] = self.tree.item(item, "values")[self.tree_map_ind["num"]]
+            task["percentage"] = self.tree.item(item, "values")[self.tree_map_ind["percentage"]]
             self.taskinfo["task"+str(pos+1)] = task
         self.set_data["taskinfo"] = self.taskinfo
         fp = codecs.open("./init_config.cfg", "w", "utf8")
@@ -342,6 +382,7 @@ class MainWindows(object):
         self.time_enter = tk.Entry(self.bottom_frame, font=self.my_ft2, width = 5, highlightcolor="LightGrey")
         self.time_enter.bind("<Return>", time_enter_submit) # 绑定enter键的触发
         self.time_enter.pack(side=tk.LEFT, padx=0, pady=50)  # 将小部件放置到窗口中
+        self.time_enter.insert(0, str(self.refresh_time))
 
         self.start_button = tk.Button(self.bottom_frame, text="开始任务", bg="LightBlue",
                                 command=self.start_task, font=self.my_ft2, fg="white", width=10)

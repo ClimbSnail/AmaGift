@@ -5,17 +5,23 @@ import time
 # 微信对象
 class Wechat(object):
 
-    def __init__(self):
+    def __init__(self, name = "filehelper"):
         self.itchat = itchat
-        pass
+        self.name = name
 
     def run(self):
-        #self.itchat.auto_login(hotReload = True)  # 会弹出网页二维码，扫描即可，登入你的微信账号，True保持登入状态
-        self.itchat.auto_login()  # 会弹出网页二维码，扫描即可，登入你的微信账号，True保持登入状态
-        my_friend = self.itchat.search_friends(name="wuhao")  # name改成你朋友在你微信的备注
-        self.receiver = [name["UserName"] for name in my_friend]
-        self.receiver.append("filehelper")  # 添加微信号
-        self.emergency = "filehelper"
+        try:
+            #self.itchat.auto_login(hotReload = True)  # 会弹出网页二维码，扫描即可，登入你的微信账号，True保持登入状态
+            self.itchat.auto_login()  # 会弹出网页二维码，扫描即可，登入你的微信账号，True保持登入状态
+            # my_friend = self.itchat.search_friends(name="")  # name改成你朋友在你微信的备注
+            # self.receiver = [name["UserName"] for name in my_friend]
+            self.receiver = []
+            self.receiver.append(self.name)  # 添加微信号
+            self.emergency = self.name
+        except Exception as err:
+            print(err.__traceback__.tb_frame.f_globals["__file__"],
+              "\tLines：", err.__traceback__.tb_lineno)  # 发生异常所在的文件
+            print(err)
 
 
     def send_to(self, message, receiver):
@@ -46,7 +52,7 @@ class Wechat(object):
 
 if __name__ == "__main__":
 
-    wc = Wechat()
+    wc = Wechat("filehelper")
     wc.run()
     print("Hello")
     wc.send_to_me("监控程序已启动！")

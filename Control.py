@@ -7,6 +7,7 @@ import ctypes
 import inspect
 import requests
 from lxml import etree
+from playsound import PlaySound	#
 
 
 
@@ -38,8 +39,13 @@ def _async_raise(thread):
 class Control(object):
 
     def __init__(self, win, data_lock):
+        self.__system = "windows"
+
+        if self.__system == "windows":
+            self.player = PlaySound()
+
         self.wechat_login_flag = False
-        self.wc = Wechat()
+        self.wc = Wechat(win.system_init["wechat_alarm"])
         self.win_close = False
         self.task_list = []
         self.reObject = re.compile(r'[\,\(\)%]')
@@ -77,34 +83,47 @@ class Control(object):
                     win.set_wechat_status(True)
                     self.wechat_login_flag = True
                 except Exception as err:
+                    print(err.__traceback__.tb_frame.f_globals["__file__"],
+			          "\tLines：", err.__traceback__.tb_lineno)  # 发生异常所在的文件
                     print(err)
             time.sleep(1.0)
             print("WeChat休眠！")
 
     def MySpider(self, win, data_lock):
         while True:
-            if win.run_status == True:
-                task_list, kind = self.get_task_list(win, data_lock)
-                data_list = []
-                for ind in kind:
-                    data_list = data_list + self.get_data(win.system_init["link"], ind)
-                data_list = self.deal_data(data_list)
-                print(task_list)
-                print(data_list)
-                res = set()
-                for reality in data_list:
-                    for expectation in task_list:
-                        if True == self.compare(expectation, reality):
-                            res.add(reality)
-                            break
-                for history in res:
-                    print(history)
-                if self.wechat_login_flag == True:
+            try:
+                if win.run_status == True:
+                    task_list, kind = self.get_task_list(win, data_lock)
+                    data_list = []
+                    for ind in kind:
+                        data_list = data_list + self.get_data(win.system_init["link"], ind)
+                    data_list = self.deal_data(data_list)
+                    print(task_list)
+                    print(data_list)
+                    res = []
+                    task_run_res = [0]*len(task_list)
+                    for reality in data_list:
+                        for expectation, pos in zip(task_list, range(len(task_list))):
+                            if expectation !=[] and True == self.compare(expectation, reality):
+                                res.append(reality)
+                                task_run_res[pos] = 1
+                                break
+                    print("*"*20)
+                    win.task_run_res = task_run_res
+                    win.updata_task_res()
                     for history in res:
-                        self.wc.send_to_me(str(history))
                         print(history)
-                    pass
-
+                    if len(res)!=0:
+                        self.playMusic(win.system_init["alarm"])
+                    if self.wechat_login_flag == True:
+                        for history in res:
+                            self.wc.send_to_me(str(history))
+                            print(history)
+                    print("*"*20)
+            except Exception as err:
+                print(err.__traceback__.tb_frame.f_globals["__file__"],
+			  "\tLines：", err.__traceback__.tb_lineno)  # 发生异常所在的文件
+                print(err)
             time.sleep( win.refresh_time ) # 刷新时间
             print("Spider线程休眠！")
 
@@ -113,7 +132,7 @@ class Control(object):
         for line in data_list:
             new_line_data = []
             new_line_data.append( self.link_map[line[0]] )
-            new_line_data.append( int(line[1]) )
+            new_line_data.append( int(self.reObject.sub("", line[1])) )
             new_line_data.append( int(self.reObject.sub("", line[2])) )
             new_line_data.append( int(self.reObject.sub("", line[3])) )
             new_line_data.append( float(line[4]) )
@@ -126,73 +145,97 @@ class Control(object):
         """
         得到指定网页并解析里面的数据成列表
         """
-        re = requests.post(url=url, data={"g_type": currency})
-        re.encoding = 'utf-8'  # 编码格式
-        html = etree.HTML(re.text)
-        trs = html.xpath('/html/body/section/section/div[3]/section/article/div/table/tr')
         data_list = []
-        for tr in trs[1:]:
-            tds = tr.xpath('./td')
-            td_text = []
-            td_text = td_text + tds[0].xpath('./img/@src')
-            for td in tds[1:5]:
-                try:
-                    td_text = td_text + td.xpath('./span/text()')
-                except Exception as err:
-                    print(err)
+        try:
+            re = requests.post(url=url, data={"g_type": currency})
+            re.encoding = 'utf-8'  # 编码格式
+            html = etree.HTML(re.text)
+            trs = html.xpath('/html/body/section/section/div[3]/section/article/div/table/tr')
+            for tr in trs[1:]:
+                tds = tr.xpath('./td')
+                td_text = []
+                td_text = td_text + tds[0].xpath('./img/@src')
+                for td in tds[1:5]:
+                    try:
+                        td_text = td_text + td.xpath('./span/text()')
+                    except Exception as err:
+                        print(err)
 
-            td_text = td_text + tr.xpath('./td[@class="pc"]/text()')
-            td_text = td_text + tds[6].xpath('./text()')
-            data_list.append(td_text)
+                td_text = td_text + tr.xpath('./td[@class="pc"]/text()')
+                td_text = td_text + tds[6].xpath('./text()')
+                data_list.append(td_text)
+        except Exception as err:
+            print(err)
         return data_list
 
     def compare(self, expectation, reality):
         if expectation[0] != reality[0]:
             return False
-        if expectation[1]!=0 and expectation[2]!=0:
-            if expectation[1]>reality[1] or reality[1]>expectation[2]:
+        if expectation[1]!=0 and expectation[1]>reality[1]:
+            return False
+        if expectation[2]!=0 or expectation[3]!=0:
+            if expectation[2]>reality[2] or reality[2]>expectation[3]:
                 return False
-        if expectation[3]!=0 and expectation[4]!=0:
-            if expectation[3]>reality[2] or reality[2]>expectation[4]:
+        if expectation[4]!=0 or expectation[5]!=0:
+            if expectation[4]>reality[3] or reality[3]>expectation[5]:
                 return False
-        # if expectation[5] != reality[3]:
+        # if expectation[6] != reality[4]:
         #     return False
-        if expectation[6]!=0 and expectation[7]!=0:
-            if expectation[6]>reality[5] or reality[5]>expectation[7]:
+        if expectation[7]!=0 or expectation[8]!=0:
+            if expectation[7]>reality[5] or reality[5]>expectation[8]:
                 return False
-        if expectation[8]!=0 and expectation[9]!=0:
-            if expectation[8]>reality[6] or reality[6]>expectation[9]:
+        if expectation[9]!=0 or expectation[10]!=0:
+            if expectation[9]>reality[6] or reality[6]>expectation[10]:
                 return False
         return True
 
     def get_task_list(self, win, data_lock):
-        index = win.task_status_ind = 6  # 状态信息所在字段的位置
+        index = win.task_status_ind  # 状态信息所在字段的位置
         task_list = []
         kind = []
         # -------------此处记得加上线程锁--------------------#
         data_lock.acquire()  # 获得锁
         # 遍历Treeview中所有的行
         for item in win.tree.get_children():
-            if win.tree.item(item, "values")[index] == "运行中":
-                task = []
+            task = []
+            if "运行中" in win.tree.item(item, "values")[index]:
+
                 link_ind = self.kind_map[win.tree.item(item, "values")[0]]
                 if link_ind not in kind:
                     kind.append(link_ind)
-                task.append(win.tree.item(item, "values")[0])
-                price = win.tree.item(item, "values")[1].split("-")
+                task.append(win.tree.item(item, "values")[win.tree_map_ind["curchoose"]])
+                task.append(int(win.tree.item(item, "values")[win.tree_map_ind["remainder"]]))
+                facevalue = win.tree.item(item, "values")[win.tree_map_ind["facevalue"]].split("-")
+                task = task + [int(facevalue[0]), int(facevalue[1])]
+                price = win.tree.item(item, "values")[win.tree_map_ind["price"]].split("-")
                 task = task + [int(price[0]), int(price[1])]
-                price = win.tree.item(item, "values")[2].split("-")
-                task = task + [int(price[0]), int(price[1])]
-                task.append(int(win.tree.item(item, "values")[3]) )
-                num = win.tree.item(item, "values")[4].split("-")
+                task.append(int(win.tree.item(item, "values")[win.tree_map_ind["salesrate"]]) )
+                num = win.tree.item(item, "values")[win.tree_map_ind["num"]].split("-")
                 task = task + [int(num[0]), int(num[1])]
-                percent = win.tree.item(item, "values")[5].split("-")
+                percent = win.tree.item(item, "values")[win.tree_map_ind["percentage"]].split("-")
                 task = task + [float(percent[0]), float(percent[1])]
-
-                task_list.append(task)
+            task_list.append(task)
 
         data_lock.release()  # 释放锁
         return task_list, kind
+
+    def playMusic(self, musicPath):
+        """
+        播放音乐
+        :param musicPath: 要播放音乐文件所在的路径
+        :return:None
+        """
+        # 判断路径是否存在
+        if not os.path.exists(musicPath):
+            print("Can not found path !")
+        try:
+            if self.__system == "windows":
+                if ".mp3" in musicPath:
+                    self.player.play(musicPath)
+                    self.player.stop()
+                    self.player.close()
+        except Exception as err:
+            print(err)
 
     def release(self):
         try:
