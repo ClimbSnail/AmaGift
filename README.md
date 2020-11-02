@@ -3,6 +3,8 @@
 监控网站 <https://ama-gift.com/list.php>
 ![](https://gitee.com/ClimbSnailQ/Project_Image/raw/master/Note/AmaGift.jpg)
 
+![](./AmaGift.jpg)
+
 1. 使用python编写
 2. `pip3 install requests pillow itchat lxml -i https://mirrors.aliyun.com/pypi/simple/`
 
